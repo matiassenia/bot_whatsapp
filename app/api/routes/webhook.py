@@ -1,6 +1,9 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 from app.core.config import settings
-from app.services.meta_parser import extract_message_info, parse_inbound_message
+
+from app.services.message_dispatcher import dispatch_incoming_message
+
+from app.services.meta_parser import  parse_inbound_message
 from fastapi.responses import PlainTextResponse
 from app.services.whatsapp_client import send_text_message
 
@@ -26,17 +29,16 @@ async def receive_webhook(request: Request):
     message = parse_inbound_message(payload)
 
     print("-------------WEBHOOK RECEIVED-------------------")
-    print(message)
+    if message:
+        print(json.dumps(message.model_dump(), indent=2, ensure_ascii=False))
+    else:
+        print("No actionable inbound message found")
     print("--------------------------------")
 
-    if message and message.text:
-        incoming_text = message.text.strip().lower()
-        from_number = message.phone
-        
-        if incoming_text == "hola":
-            send_text_message(
-            to=from_number, 
-           body="¡Hola! Bienvenido a Aserrín\n\n1️⃣ Ver menú\n2️⃣ Ver promos\n3️⃣ Hacer pedido"
-            )
-
+    if message: 
+        try:
+            dispatch_incoming_message(message)
+        except Exception as e:
+            print(f"Error dispatching message: {e}")
+            
     return {"status": "received"}
