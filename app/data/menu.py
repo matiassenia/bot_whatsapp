@@ -1,37 +1,105 @@
-MENU_TEXT = """🍕 *Menú Aserrín*
+PIZZAS = {
+    "muzza": {"name": "Muzzarella", "price": 10000},
+    "pepperoni": {"name": "Pepperoni", "price": 13000},
+    "fugazzeta": {"name": "Fugazzeta", "price": 12000},
+    "tres_quesos": {"name": "Tres quesos", "price": 13500},
+    "napolitana": {"name": "Napolitana", "price": 12000},
+    "jamon_morron": {"name": "Jamón y morrón", "price": 13500},
+}
 
-1. Margharita
-2. Doble muzza
-3. Hot Honey Pepperoni
-4. Jamón & Morrones
-5. Fugazza
-6. 3 Quesos
-7. Pesto
-8. Mitá Mitá
+BEVERAGES = {
+    "coca_500": {"name": "Coca Cola 500ml", "price": 2500},
+    "coca_15": {"name": "Coca Cola 1.5L", "price": 4500},
+    "sprite_15": {"name": "Sprite 1.5L", "price": 4500},
+    "agua": {"name": "Agua", "price": 1800},
+}
 
-Escribí el nombre de la pizza o el número de opción.
-"""
+DESSERTS = {
+    "flan": {"name": "Flan", "price": 3500},
+    "helado": {"name": "Helado", "price": 4000},
+    "brownie": {"name": "Brownie", "price": 3200},
+}
 
-PROMOS_TEXT = """🔥 *Promos del día*
 
-- 2 Muzza + bebida
-- 1 Pepperoni + 1 Fugazzeta
-- Combo amigos x4
+PIZZA_KEYWORDS = {
+    "muzza": "muzza",
+    "muzzarella": "muzza",
+    "pepperoni": "pepperoni",
+    "fugazzeta": "fugazzeta",
+    "fuga": "fugazzeta",
+    "tres quesos": "tres_quesos",
+    "3 quesos": "tres_quesos",
+    "napolitana": "napolitana",
+    "jamon y morron": "jamon_morron",
+    "jamón y morrón": "jamon_morron",
+    "jamon morron": "jamon_morron",
+    "jamón morrón": "jamon_morron",
+}
 
-Escribí *pedido* para empezar.
-"""
+BEVERAGE_KEYWORDS = {
+    "coca 500": "coca_500",
+    "coca cola 500": "coca_500",
+    "coca 1.5": "coca_15",
+    "coca cola 1.5": "coca_15",
+    "sprite": "sprite_15",
+    "agua": "agua",
+}
 
-ORDER_TEXT = """🧾 *Tomemos tu pedido*
+DESSERT_KEYWORDS = {
+    "flan": "flan",
+    "helado": "helado",
+    "brownie": "brownie",
+}
 
-Decime:
-- qué pizza querés
-- cuántas
-- y tu dirección
 
-Ejemplo:
-'Quiero 2 muzzas en San Miguel 123'
-"""
+PIZZA_INDEX_MAP = {
+    "1": "muzza",
+    "2": "pepperoni",
+    "3": "fugazzeta",
+    "4": "tres_quesos",
+    "5": "napolitana",
+    "6": "jamon_morron",
+}
 
-HUMAN_TEXT = """🙋 Te derivamos con una persona.
+BEVERAGE_INDEX_MAP = {
+    "1": "coca_500",
+    "2": "coca_15",
+    "3": "sprite_15",
+    "4": "agua",
+}
 
-En breve seguimos por acá."""
+DESSERT_INDEX_MAP = {
+    "1": "flan",
+    "2": "helado",
+    "3": "brownie",
+}
+
+
+def format_currency(value: int) -> str:
+    return f"${value:,}".replace(",", ".")
+
+
+def format_pizzas() -> str:
+    lines = ["🍕 *Pizzas*"]
+    for idx, key in enumerate(PIZZAS.keys(), start=1):
+        pizza = PIZZAS[key]
+        lines.append(f"{idx}. {pizza['name']} - {format_currency(pizza['price'])}")
+    lines.append("")
+    lines.append("Podés pedir pizza *entera* o escribir *mitad y mitad*.")
+    return "\n".join(lines)
+
+
+def format_beverages() -> str:
+    lines = ["🥤 *Bebidas*"]
+    for idx, key in enumerate(BEVERAGES.keys(), start=1):
+        bev = BEVERAGES[key]
+        lines.append(f"{idx}. {bev['name']} - {format_currency(bev['price'])}")
+    return "\n".join(lines)
+
+
+def format_desserts() -> str:
+    lines = ["🍰 *Postres*"]
+    for idx, key in enumerate(DESSERTS.keys(), start=1):
+        dessert = DESSERTS[key]
+        lines.append(f"{idx}. {dessert['name']} - {format_currency(dessert['price'])}")
+    return "\n".join(lines)
