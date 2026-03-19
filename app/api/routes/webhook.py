@@ -27,7 +27,7 @@ async def verify_webhook(
 async def receive_webhook(request: Request):
     payload = await request.json()
 
-    print("-------------WEBHOOK RECEIVED-------------------")
+    print("------------- WEBHOOK RECEIVED ----------------")
 
     message = parse_inbound_message(payload)
 
@@ -37,7 +37,7 @@ async def receive_webhook(request: Request):
     else:
         print("No actionable inbound message found")
 
-    print("--------------------------------")
+    print("------------------------------------------------")
 
     if message:
         try:
