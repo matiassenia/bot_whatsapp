@@ -181,7 +181,6 @@ def _append_pending_item_to_cart(conversation: dict, quantity: int) -> dict:
     conversation["pending_item"] = None
     return cart_item
 
-
 def handle_incoming_message(message: InboundMessage) -> str | None:
     if not message.text:
         return None
@@ -193,49 +192,86 @@ def handle_incoming_message(message: InboundMessage) -> str | None:
     state = conversation["state"]
     conversation["last_message"] = raw_text
 
-    if text in WELCOME_WORDS:
-        conversation["state"] = ConversationState.WELCOME
-        save_conversation(message.phone, conversation)
-        return build_welcome_message()
+    # =========================================================
+    # 1) PRIORIDAD ABSOLUTA: estados específicos del flujo
+    # =========================================================
 
-    if text in MENU_WORDS:
-        conversation["state"] = ConversationState.BROWSING_MENU
-        save_conversation(message.phone, conversation)
-        return build_full_menu_message()
+    if state == ConversationState.AWAITING_CONFIRMATION:
+        if text in CONFIRM_WORDS:
+            reset_conversation(message.phone)
+            return build_order_confirmed_message()
 
-    if text in PIZZA_MENU_WORDS and state not in {
-        ConversationState.COLLECTING_MORE_ITEMS,
-        ConversationState.CHOOSING_CATEGORY,
-    }:
-        conversation["state"] = ConversationState.BROWSING_PIZZAS
-        save_conversation(message.phone, conversation)
-        return build_pizzas_message()
+        if text in CANCEL_WORDS:
+            reset_conversation(message.phone)
+            return "Pedido cancelado. Escribí *hola* para empezar de nuevo."
 
-    if text in BEVERAGE_MENU_WORDS and state not in {
-        ConversationState.COLLECTING_MORE_ITEMS,
-        ConversationState.CHOOSING_CATEGORY,
-    }:
-        conversation["state"] = ConversationState.BROWSING_BEVERAGES
+    if state == ConversationState.AWAITING_ADDRESS:
+        conversation["address"] = raw_text
+        conversation["state"] = ConversationState.AWAITING_CONFIRMATION
         save_conversation(message.phone, conversation)
-        return build_beverages_message()
+        return build_order_summary_message(
+            cart_items=conversation["cart"],
+            address=conversation["address"],
+        )
 
-    if text in DESSERT_MENU_WORDS and state not in {
-        ConversationState.COLLECTING_MORE_ITEMS,
-        ConversationState.CHOOSING_CATEGORY,
-    }:
-        conversation["state"] = ConversationState.BROWSING_DESSERTS
-        save_conversation(message.phone, conversation)
-        return build_desserts_message()
+    if state == ConversationState.CHOOSING_QUANTITY:
+        quantity = _extract_quantity(text)
+        if quantity and conversation["pending_item"]:
+            cart_item = _append_pending_item_to_cart(conversation, quantity)
+            conversation["state"] = ConversationState.COLLECTING_MORE_ITEMS
+            save_conversation(message.phone, conversation)
+            return build_item_added_message(
+                item_description=cart_item["description"],
+                quantity=cart_item["quantity"],
+            )
 
-    if text in ORDER_WORDS:
-        conversation["state"] = ConversationState.CHOOSING_CATEGORY
-        save_conversation(message.phone, conversation)
-        return build_choose_category_message()
+    if state == ConversationState.CHOOSING_BEVERAGE:
+        beverage_key = _find_beverage_key(text)
+        if beverage_key:
+            pending_item = _build_beverage_pending(beverage_key)
+            conversation["pending_item"] = pending_item
+            conversation["state"] = ConversationState.CHOOSING_QUANTITY
+            save_conversation(message.phone, conversation)
+            return build_ask_quantity_message(pending_item["description"])
 
-    if text in HUMAN_WORDS:
-        conversation["state"] = ConversationState.HANDOFF_TO_HUMAN
-        save_conversation(message.phone, conversation)
-        return build_human_message()
+    if state == ConversationState.CHOOSING_DESSERT:
+        dessert_key = _find_dessert_key(text)
+        if dessert_key:
+            pending_item = _build_dessert_pending(dessert_key)
+            conversation["pending_item"] = pending_item
+            conversation["state"] = ConversationState.CHOOSING_QUANTITY
+            save_conversation(message.phone, conversation)
+            return build_ask_quantity_message(pending_item["description"])
+
+    if state == ConversationState.CHOOSING_HALF_AND_HALF:
+        half_combo = _extract_half_and_half(text)
+        if half_combo:
+            first_key, second_key = half_combo
+            pending_item = _build_half_pizza_pending(first_key, second_key)
+            conversation["pending_item"] = pending_item
+            conversation["state"] = ConversationState.CHOOSING_QUANTITY
+            save_conversation(message.phone, conversation)
+            return build_ask_quantity_message(pending_item["description"])
+
+    if state == ConversationState.CHOOSING_PIZZA_FLAVOR:
+        pizza_key = _find_pizza_key(text)
+        if pizza_key:
+            pending_item = _build_whole_pizza_pending(pizza_key)
+            conversation["pending_item"] = pending_item
+            conversation["state"] = ConversationState.CHOOSING_QUANTITY
+            save_conversation(message.phone, conversation)
+            return build_ask_quantity_message(pending_item["description"])
+
+    if state == ConversationState.CHOOSING_PIZZA_TYPE:
+        if text in WHOLE_WORDS:
+            conversation["state"] = ConversationState.CHOOSING_PIZZA_FLAVOR
+            save_conversation(message.phone, conversation)
+            return build_choose_pizza_flavor_message()
+
+        if text in HALF_WORDS:
+            conversation["state"] = ConversationState.CHOOSING_HALF_AND_HALF
+            save_conversation(message.phone, conversation)
+            return build_choose_half_and_half_message()
 
     if state in {ConversationState.CHOOSING_CATEGORY, ConversationState.COLLECTING_MORE_ITEMS}:
         if text in CATEGORY_PIZZA_WORDS:
@@ -257,86 +293,50 @@ def handle_incoming_message(message: InboundMessage) -> str | None:
             if not conversation["cart"]:
                 save_conversation(message.phone, conversation)
                 return "Todavía no agregaste productos. Escribí *pizza*, *bebida* o *postre*."
+
             conversation["state"] = ConversationState.AWAITING_ADDRESS
             save_conversation(message.phone, conversation)
             return build_ask_address_message()
 
-    if state == ConversationState.CHOOSING_PIZZA_TYPE:
-        if text in WHOLE_WORDS:
-            conversation["state"] = ConversationState.CHOOSING_PIZZA_FLAVOR
-            save_conversation(message.phone, conversation)
-            return build_choose_pizza_flavor_message()
+    # =========================================================
+    # 2) COMANDOS GLOBALES (fuera del flujo específico)
+    # =========================================================
 
-        if text in HALF_WORDS:
-            conversation["state"] = ConversationState.CHOOSING_HALF_AND_HALF
-            save_conversation(message.phone, conversation)
-            return build_choose_half_and_half_message()
-
-    if state == ConversationState.CHOOSING_PIZZA_FLAVOR:
-        pizza_key = _find_pizza_key(text)
-        if pizza_key:
-            pending_item = _build_whole_pizza_pending(pizza_key)
-            conversation["pending_item"] = pending_item
-            conversation["state"] = ConversationState.CHOOSING_QUANTITY
-            save_conversation(message.phone, conversation)
-            return build_ask_quantity_message(pending_item["description"])
-
-    if state == ConversationState.CHOOSING_HALF_AND_HALF:
-        half_combo = _extract_half_and_half(text)
-        if half_combo:
-            first_key, second_key = half_combo
-            pending_item = _build_half_pizza_pending(first_key, second_key)
-            conversation["pending_item"] = pending_item
-            conversation["state"] = ConversationState.CHOOSING_QUANTITY
-            save_conversation(message.phone, conversation)
-            return build_ask_quantity_message(pending_item["description"])
-
-    if state == ConversationState.CHOOSING_BEVERAGE:
-        beverage_key = _find_beverage_key(text)
-        if beverage_key:
-            pending_item = _build_beverage_pending(beverage_key)
-            conversation["pending_item"] = pending_item
-            conversation["state"] = ConversationState.CHOOSING_QUANTITY
-            save_conversation(message.phone, conversation)
-            return build_ask_quantity_message(pending_item["description"])
-
-    if state == ConversationState.CHOOSING_DESSERT:
-        dessert_key = _find_dessert_key(text)
-        if dessert_key:
-            pending_item = _build_dessert_pending(dessert_key)
-            conversation["pending_item"] = pending_item
-            conversation["state"] = ConversationState.CHOOSING_QUANTITY
-            save_conversation(message.phone, conversation)
-            return build_ask_quantity_message(pending_item["description"])
-
-    if state == ConversationState.CHOOSING_QUANTITY:
-        quantity = _extract_quantity(text)
-        if quantity and conversation["pending_item"]:
-            cart_item = _append_pending_item_to_cart(conversation, quantity)
-            conversation["state"] = ConversationState.COLLECTING_MORE_ITEMS
-            save_conversation(message.phone, conversation)
-            return build_item_added_message(
-                item_description=cart_item["description"],
-                quantity=cart_item["quantity"],
-            )
-
-    if state == ConversationState.AWAITING_ADDRESS:
-        conversation["address"] = raw_text
-        conversation["state"] = ConversationState.AWAITING_CONFIRMATION
+    if text in WELCOME_WORDS:
+        conversation["state"] = ConversationState.WELCOME
         save_conversation(message.phone, conversation)
-        return build_order_summary_message(
-            cart_items=conversation["cart"],
-            address=conversation["address"],
-        )
+        return build_welcome_message()
 
-    if state == ConversationState.AWAITING_CONFIRMATION:
-        if text in CONFIRM_WORDS:
-            reset_conversation(message.phone)
-            return build_order_confirmed_message()
+    if text in MENU_WORDS:
+        conversation["state"] = ConversationState.BROWSING_MENU
+        save_conversation(message.phone, conversation)
+        return build_full_menu_message()
 
-        if text in CANCEL_WORDS:
-            reset_conversation(message.phone)
-            return "Pedido cancelado. Escribí *hola* para empezar de nuevo."
+    if text in PIZZA_MENU_WORDS:
+        conversation["state"] = ConversationState.BROWSING_PIZZAS
+        save_conversation(message.phone, conversation)
+        return build_pizzas_message()
+
+    if text in BEVERAGE_MENU_WORDS:
+        conversation["state"] = ConversationState.BROWSING_BEVERAGES
+        save_conversation(message.phone, conversation)
+        return build_beverages_message()
+
+    if text in DESSERT_MENU_WORDS:
+        conversation["state"] = ConversationState.BROWSING_DESSERTS
+        save_conversation(message.phone, conversation)
+        return build_desserts_message()
+
+    if text in ORDER_WORDS:
+        conversation["state"] = ConversationState.CHOOSING_CATEGORY
+        save_conversation(message.phone, conversation)
+        return build_choose_category_message()
+
+    if text in HUMAN_WORDS:
+        conversation["state"] = ConversationState.HANDOFF_TO_HUMAN
+        save_conversation(message.phone, conversation)
+        return build_human_message()
 
     save_conversation(message.phone, conversation)
     return build_fallback_message()
+    
