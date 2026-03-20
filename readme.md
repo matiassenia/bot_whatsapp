@@ -1,73 +1,124 @@
 # Aserrín WhatsApp Bot
 
-Backend service that integrates the **WhatsApp Cloud API (Meta)** with a **FastAPI webhook** to receive and process incoming WhatsApp messages.
+Backend service for **Aserrín Pizzas** built with **FastAPI** and integrated with the **WhatsApp Cloud API (Meta)**.
 
-This project is the foundation of an automated ordering system for **Aserrín Pizzas**, allowing customers to interact with a bot through WhatsApp.
+This project implements the foundation of a conversational ordering bot that can:
 
-The system currently implements:
+- receive inbound WhatsApp messages through a webhook
+- verify the Meta webhook
+- parse inbound Meta payloads into internal schemas
+- manage a stateful conversation flow in memory
+- show menus for pizzas, beverages, and desserts
+- support pizza ordering, including **whole pizzas** and **half-and-half pizzas**
+- collect quantities
+- build a structured cart
+- request delivery address
+- generate an order summary with totals
+- confirm or cancel orders
+- simulate the full flow locally without relying on Meta delivery
+
+---
+
+# Current Features
 
 - WhatsApp Cloud API integration
 - Webhook verification with Meta
-- Reception of incoming messages
-- Structured backend architecture ready for extensions
-- Local development with FastAPI
-- Public webhook exposure using ngrok
-
-Future iterations will include:
-
-- conversation state management
-- order processing
-- Redis for conversation state
-- PostgreSQL for persistence
-- menu system
-- automated ordering flow
+- FastAPI webhook endpoint for inbound messages
+- Meta payload parser
+- In-memory conversation state store
+- Stateful order flow
+- Menu browsing
+- Product selection by text or number
+- Half-and-half pizza support
+- Quantity handling
+- Cart summary generation
+- Local simulator for order flow testing
 
 ---
 
 # Architecture
 
-High level flow:
-Customer (WhatsApp)
-↓
-WhatsApp Cloud API (Meta)
-↓
-Webhook HTTP request
-↓
-FastAPI backend
-↓
-Message processing
+High-level flow:
 
+Customer (WhatsApp or local simulator)  
+↓  
+WhatsApp Cloud API (Meta) or local HTTP request  
+↓  
+FastAPI `/webhook` endpoint  
+↓  
+Meta payload parsing  
+↓  
+Message dispatcher  
+↓  
+Conversation service (state machine)  
+↓  
+Response generation  
+↓  
+Optional WhatsApp API delivery
 
+---
 
-Webhook events are sent by Meta every time a user sends a message to the WhatsApp number.
+# Conversation Flow
+
+The bot currently supports a flow like this:
+
+1. User says `hola`
+2. Bot shows welcome message
+3. User starts an order with `5` or `pedido`
+4. User chooses a category: pizza, bebida, postre
+5. User selects an item
+6. Bot asks for quantity
+7. User can continue adding items
+8. User writes `finalizar`
+9. Bot asks for address
+10. Bot shows structured order summary
+11. User confirms or cancels
+
+Example supported order:
+
+- 2 x half-and-half pizza (Muzzarella + Pepperoni)
+- 1 x Coca Cola 1.5L
+- delivery address
+- final confirmation
 
 ---
 
 # Project Structure
 
+```text
 aserrin-whatsapp-bot/
 │
 ├── app/
-│ ├── main.py # FastAPI application entrypoint
-│ │
-│ ├── core/
-│ │ └── config.py # Environment configuration
-│ │
-│ ├── api/
-│ │ └── routes/
-│ │ └── webhook.py # WhatsApp webhook endpoints
-│ │
-│ ├── services/
-│ │ ├── meta_parser.py # Parses Meta webhook payloads (future step)
-│ │ └── whatsapp_client.py # Sends messages through WhatsApp API (future step)
-│ │
-│ └── schemas/
-│ └── webhook.py # Data schemas for webhook payloads
+│   ├── main.py
+│   │
+│   ├── core/
+│   │   └── config.py
+│   │
+│   ├── api/
+│   │   └── routes/
+│   │       └── webhook.py
+│   │
+│   ├── data/
+│   │   └── menu.py
+│   │
+│   ├── schemas/
+│   │   ├── webhook.py
+│   │   └── conversation_state.py
+│   │
+│   ├── services/
+│   │   ├── meta_parser.py
+│   │   ├── whatsapp_client.py
+│   │   ├── message_dispatcher.py
+│   │   ├── message_builder.py
+│   │   ├── conversation_service.py
+│   │   └── conversation_store.py
 │
-├── .env # Environment variables
-├── requirements.txt # Python dependencies
+├── scripts/
+│   └── test_order_flow.py
+│
+├── .env
+├── requirements.txt
 └── README.md
-
 
 ---
 
@@ -76,8 +127,8 @@ aserrin-whatsapp-bot/
 - Python 3.10+
 - Meta Developer account
 - WhatsApp Cloud API enabled
-- ngrok
-
+- ngrok (for public webhook testing)
+- a valid access token if you want real outbound replies
 ---
 
 # Installation
@@ -121,15 +172,15 @@ VERIFY_TOKEN=aserrin_verify_token
 
 WHATSAPP_ACCESS_TOKEN=YOUR_ACCESS_TOKEN
 WHATSAPP_PHONE_NUMBER_ID=YOUR_PHONE_NUMBER_ID
-
 WHATSAPP_API_VERSION=v22.0
 
 
-Values required from the **Meta Developer Console**.
+These values required from the **Meta Developer Console**.
 
 ---
 
 # Running the Application
+-For local development without live reload issues:
 
 Start the FastAPI server:
 
@@ -151,14 +202,30 @@ Expected response:
 }
 
 
----
+#-Local Testing Wihout Meta
+
+You can test the complete order flow locally without sending real sending real WhatsApp replies.
+
+Impotant
+If you Meta acces token is expired or you only want to test the internal conversation flow, temporarily comment out send_text_message(...) in:
+
+app/services/message_dispatcher.py
+
+# -Run the server
+
+uvicorn app.main:app --port 8000
+
+# Run the simulator
+
+python scripts/test_order_flow.py
+
+This will send a sequence of webhook requests that simulate a full customer order.
 
 # Exposing the Webhook (ngrok)
 
 Meta requires a **public URL** for webhook callbacks.
 
 Run:
-
 
 ngrok http 8000
 
@@ -217,20 +284,22 @@ You should see the webhook payload printed in the server logs.
 
 Planned improvements:
 
-- Meta webhook payload parser
-- automatic responses
-- conversation state machine
-- order management
-- Redis conversation state
-- PostgreSQL persistence
-- async workers
-- analytics and monitoring
+-Redis for convcersation state
+-PostgreSql for order persistence
+-real order entity and order items
+-improved observability and sturctured logging
+-better error handling
+-production-ready WhatsApp reply delivery
+-admin/operator handoff flow
+-payment and delivery options
 
 ---
 
 # Tech Stack
 
-- FastAPI
-- WhatsApp Cloud API
 - Python
+- FastAPI
+- Pydantic
+- Request
+- WhatsApp Cloud API
 - ngrok

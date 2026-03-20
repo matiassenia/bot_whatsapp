@@ -191,10 +191,27 @@ def handle_incoming_message(message: InboundMessage) -> str | None:
     conversation = get_conversation(message.phone)
     state = conversation["state"]
     conversation["last_message"] = raw_text
-
+    
+    print((f"CURRENT STATE: {state}"))
+    print((f"NORMALIZED TEXT: {text}"))
+   
+      # =========================================================
+    # GLOBAL COMMANDS THAT SHOULD ALWAYS WORK
     # =========================================================
-    # 1) PRIORIDAD ABSOLUTA: estados específicos del flujo
+    if text in HUMAN_WORDS:
+        conversation["state"] = ConversationState.HANDOFF_TO_HUMAN
+        save_conversation(message.phone, conversation)
+        return build_human_message()
+    
+    if text in WELCOME_WORDS:
+        conversation["state"] = ConversationState.WELCOME
+        save_conversation(message.phone, conversation)
+        return build_welcome_message()
+    
+     # =========================================================
+    # STATEFUL FLOW HAS PRIORITY OVER GLOBAL MENU SHORTCUTS
     # =========================================================
+    
 
     if state == ConversationState.AWAITING_CONFIRMATION:
         if text in CONFIRM_WORDS:
@@ -204,6 +221,9 @@ def handle_incoming_message(message: InboundMessage) -> str | None:
         if text in CANCEL_WORDS:
             reset_conversation(message.phone)
             return "Pedido cancelado. Escribí *hola* para empezar de nuevo."
+        
+        save_conversation(message.phone, conversation)
+        return "Escribí *confirmar* para cerrar el pedido o *cancelar* para empezar de nuevo."
 
     if state == ConversationState.AWAITING_ADDRESS:
         conversation["address"] = raw_text
@@ -224,6 +244,9 @@ def handle_incoming_message(message: InboundMessage) -> str | None:
                 item_description=cart_item["description"],
                 quantity=cart_item["quantity"],
             )
+            
+        save_conversation(message.phone, conversation)
+        return "Necesito una cantidad válida. Escribí un número, por ejemplo *2* o *3*."
 
     if state == ConversationState.CHOOSING_BEVERAGE:
         beverage_key = _find_beverage_key(text)
@@ -233,6 +256,9 @@ def handle_incoming_message(message: InboundMessage) -> str | None:
             conversation["state"] = ConversationState.CHOOSING_QUANTITY
             save_conversation(message.phone, conversation)
             return build_ask_quantity_message(pending_item["description"])
+        
+        save_conversation(message.phone, conversation)
+        return build_choose_beverage_message()
 
     if state == ConversationState.CHOOSING_DESSERT:
         dessert_key = _find_dessert_key(text)
@@ -242,6 +268,9 @@ def handle_incoming_message(message: InboundMessage) -> str | None:
             conversation["state"] = ConversationState.CHOOSING_QUANTITY
             save_conversation(message.phone, conversation)
             return build_ask_quantity_message(pending_item["description"])
+        
+        save_conversation(message.phone, conversation)
+        return build_choose_dessert_message()
 
     if state == ConversationState.CHOOSING_HALF_AND_HALF:
         half_combo = _extract_half_and_half(text)
@@ -252,6 +281,9 @@ def handle_incoming_message(message: InboundMessage) -> str | None:
             conversation["state"] = ConversationState.CHOOSING_QUANTITY
             save_conversation(message.phone, conversation)
             return build_ask_quantity_message(pending_item["description"])
+        
+        save_conversation(message.phone, conversation)
+        return build_choose_half_and_half_message()
 
     if state == ConversationState.CHOOSING_PIZZA_FLAVOR:
         pizza_key = _find_pizza_key(text)
@@ -272,6 +304,9 @@ def handle_incoming_message(message: InboundMessage) -> str | None:
             conversation["state"] = ConversationState.CHOOSING_HALF_AND_HALF
             save_conversation(message.phone, conversation)
             return build_choose_half_and_half_message()
+        
+        save_conversation(message.phone, conversation)
+        return build_choose_pizza_type_message()
 
     if state in {ConversationState.CHOOSING_CATEGORY, ConversationState.COLLECTING_MORE_ITEMS}:
         if text in CATEGORY_PIZZA_WORDS:
@@ -299,44 +334,33 @@ def handle_incoming_message(message: InboundMessage) -> str | None:
             return build_ask_address_message()
 
     # =========================================================
-    # 2) COMANDOS GLOBALES (fuera del flujo específico)
+    # GLOBAL MENU / NAVIGATION COMMANDS
     # =========================================================
-
-    if text in WELCOME_WORDS:
-        conversation["state"] = ConversationState.WELCOME
-        save_conversation(message.phone, conversation)
-        return build_welcome_message()
-
+    
     if text in MENU_WORDS:
         conversation["state"] = ConversationState.BROWSING_MENU
         save_conversation(message.phone, conversation)
         return build_full_menu_message()
-
+    
     if text in PIZZA_MENU_WORDS:
         conversation["state"] = ConversationState.BROWSING_PIZZAS
         save_conversation(message.phone, conversation)
         return build_pizzas_message()
-
+    
     if text in BEVERAGE_MENU_WORDS:
         conversation["state"] = ConversationState.BROWSING_BEVERAGES
         save_conversation(message.phone, conversation)
         return build_beverages_message()
-
+    
     if text in DESSERT_MENU_WORDS:
         conversation["state"] = ConversationState.BROWSING_DESSERTS
         save_conversation(message.phone, conversation)
         return build_desserts_message()
-
+    
     if text in ORDER_WORDS:
         conversation["state"] = ConversationState.CHOOSING_CATEGORY
         save_conversation(message.phone, conversation)
         return build_choose_category_message()
-
-    if text in HUMAN_WORDS:
-        conversation["state"] = ConversationState.HANDOFF_TO_HUMAN
-        save_conversation(message.phone, conversation)
-        return build_human_message()
-
+    
     save_conversation(message.phone, conversation)
     return build_fallback_message()
-    

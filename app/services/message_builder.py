@@ -3,14 +3,16 @@ from app.data.menu import format_beverages, format_currency, format_desserts, fo
 
 def build_welcome_message() -> str:
     return (
-        "🍕 *Bienvenido a Aserrín*\n\n"
-        "Elegí una opción:\n"
+        "🍕 *Bienvenido/a a Aserrín Pizas*\n\n"
+        "Podés elegir una de estas opciones:\n"
         "1️⃣ Ver menú completo\n"
         "2️⃣ Ver pizzas\n"
         "3️⃣ Ver bebidas\n"
         "4️⃣ Ver postres\n"
         "5️⃣ Hacer pedido\n"
-        "6️⃣ Hablar con humano"
+        "6️⃣ Hablar con una persona \n\n"
+        "También podés escribir directamente \n"
+        "*pizza*, *bebida*, *postre*, *pedido*, o *humano*"
     )
 
 
